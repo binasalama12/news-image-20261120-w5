@@ -8,6 +8,7 @@ world map, thirty-two briefs, a date check and sources. Writes entry.png.
 """
 
 import math
+import os
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -30,8 +31,15 @@ LB = "/usr/share/fonts/truetype/liberation/"
 def _font(path, size):
     try:
         return ImageFont.truetype(path, size)
-    except Exception:
-        return ImageFont.load_default()
+    except OSError:
+        pass
+    plain = path.rsplit("/", 1)[-1]
+    if plain != path:
+        try:
+            return ImageFont.truetype(plain, size)
+        except OSError:
+            pass
+    return ImageFont.load_default()
 
 
 def sans(size, bold=False):
@@ -614,8 +622,26 @@ def main():
            "for this page.",
            font=sans(14), fill=BODY)
 
-    im.resize((1024, 1024), Image.LANCZOS).save("entry.png")
-    print("wrote entry.png 1024x1024")
+    out = im.resize((1024, 1024), Image.LANCZOS)
+    candidates = []
+    env_dir = os.environ.get("MAKEFUN_OUTPUT_DIR")
+    if env_dir:
+        candidates.append(env_dir)
+    candidates.append(".")
+    candidates.append(os.path.dirname(os.path.abspath(__file__)))
+    last_err = None
+    saved = None
+    for cand in candidates:
+        try:
+            target = os.path.join(cand, "entry.png")
+            out.save(target)
+            saved = target
+            break
+        except OSError as err:
+            last_err = err
+    if saved is None:
+        raise last_err
+    print("wrote %s 1024x1024" % saved)
 
 
 if __name__ == "__main__":
